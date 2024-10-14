@@ -1,12 +1,12 @@
 # Standard library imports
 import copy
 import json
+import os
 from collections import defaultdict
 from typing import List, Callable, Union
 
 # Package/library imports
-from azure.core.credentials import AzureKeyCredential
-from azure.ai.openai import OpenAIClient  # Azure OpenAI Client
+from openai import AzureOpenAI
 
 
 # Local imports
@@ -25,12 +25,13 @@ __CTX_VARS_NAME__ = "context_variables"
 
 
 class Swarm:
-    def __init__(self, client=None, api_key=None, endpoint=None):
+    def __init__(self, client=None):
         if not client:
-            if not api_key or not endpoint:
-                raise ValueError("APIキーとエンドポイントが必要です。")
-            credential = AzureKeyCredential(api_key)
-            client = OpenAIClient(endpoint=endpoint, credential=credential)
+            client = AzureOpenAI(
+                api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+                api_version="2024-08-01-preview",
+                azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
+            )
         self.client = client
 
     def get_chat_completion(
@@ -70,7 +71,7 @@ class Swarm:
         if tools:
             create_params["parallel_tool_calls"] = agent.parallel_tool_calls
 
-        return self.client.chat.completions.create(**create_params)  # Adjusted for Azure
+        return self.client.chat.completions.create(**create_params)
 
     def handle_function_result(self, result, debug) -> Result:
         match result:
@@ -274,7 +275,7 @@ class Swarm:
             message.sender = active_agent.name
             history.append(
                 json.loads(message.model_dump_json())
-            )  # Adjusted for Azure
+            )  # to avoid OpenAI types (?)
 
             if not message.tool_calls or not execute_tools:
                 debug_print(debug, "Ending turn.")
